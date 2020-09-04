@@ -165,7 +165,7 @@ def test_job_failure_when_command_not_found():
         assert f.read() == ""
 
     with open(os.path.join(log_dir, "stderr")) as f:
-        assert f.read() == "/bin/sh: 1: dog: not found\n"
+        assert f.read().endswith("not found\n")
 
 
 def test_job_with_callback():
