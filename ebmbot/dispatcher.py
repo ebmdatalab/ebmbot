@@ -18,44 +18,59 @@ from .logger import logger
 from .slack import notify_slack
 
 
+CHECKED = None
+
+
 def run():  # pragma: no cover
     """Start the dispatcher running."""
+    slack_user_client = WebClient(token=settings.SLACK_BOT_USER_TOKEN)
     slack_client = WebClient(token=settings.SLACK_BOT_TOKEN)
-
+    tech_support_channel = get_tech_support_channel(slack_client)
+    checker = MessageChecker(slack_user_client, tech_support_channel)
+    checker.run_check()
     while True:
-        run_once(slack_client, job_configs.config)
+        run_once(
+            slack_client, job_configs.config, tech_support_channel=tech_support_channel
+        )
         time.sleep(1)
 
 
-def run_once(slack_client, config):
+def run_once(slack_client, config, tech_support_channel=None):
     """Clear any expired suppressions, then start a new subprocess for each
     available job.
 
     We collect and return started processes so that we can wait for them to
     finish in tests before asserting the tests have done anything.
     """
-
+    tech_support_channel = tech_support_channel or get_tech_support_channel(
+        slack_client
+    )
     scheduler.remove_expired_suppressions()
 
     processes = []
-
     while True:
         job_id = scheduler.reserve_job()
         if job_id is None:
             break
-        job_dispatcher = JobDispatcher(slack_client, job_id, config)
+        job_dispatcher = JobDispatcher(
+            slack_client, job_id, config, tech_support_channel
+        )
         processes.append(job_dispatcher.start_job())
 
     return processes
 
 
+def get_tech_support_channel(slack_client):
+    return get_channels(slack_client)[settings.SLACK_TECH_SUPPORT_CHANNEL]
+
+
 class JobDispatcher:
-    def __init__(self, slack_client, job_id, config):
+    def __init__(self, slack_client, job_id, config, tech_support_channel=None):
         logger.info("starting job", job_id=job_id)
         self.slack_client = slack_client
-        self.tech_support_channel = get_channels(self.slack_client)[
-            settings.SLACK_TECH_SUPPORT_CHANNEL
-        ]
+        self.tech_support_channel = tech_support_channel or get_tech_support_channel(
+            self.slack_client
+        )
         self.job = scheduler.get_job(job_id)
         self.job_config = config["jobs"][self.job["type"]]
 
@@ -205,6 +220,43 @@ class JobDispatcher:
         self.stdout_path = self.log_dir / "stdout"
         self.stderr_path = self.log_dir / "stderr"
         self.log_dir.mkdir(parents=True, exist_ok=True)
+
+
+class MessageChecker:
+    def __init__(self, slack_client, tech_support_channel=None):
+        self.slack_client = slack_client
+        self.tech_support_channel = tech_support_channel or get_tech_support_channel(
+            self.slack_client
+        )
+
+    def run_check(self):
+        """Start running the check in a new subprocess."""
+        p = Process(target=self.do_check)
+        p.start()
+        return p
+
+    def do_check(self):
+        while True:
+            logger.info("Checking tech-support messages")
+            # TODO handle pagination (maybe not necessary if including date)
+            # Ignore messages from bots
+            # include a from: date to limit messages
+            # Ignore messages with repost links (keyword will not be in message text)
+            # i.e. we don't want to re-sos a message that is just copy/pasting another
+            # message that included the keyword
+            messages = self.slack_client.search_messages(
+                query=(
+                    "tech-support -has::sos: "
+                    f"-in:#{settings.SLACK_TECH_SUPPORT_CHANNEL} "
+                    f"-from:@{settings.SLACK_APP_USERNAME}"
+                )
+            )["messages"]["matches"]
+            for message in messages:
+                logger.info("Messages", message=message["text"])
+                # TODO add sos, repost to tech-support channel
+
+            # TODO Also run for bennett-admins
+            time.sleep(5)
 
 
 if __name__ == "__main__":

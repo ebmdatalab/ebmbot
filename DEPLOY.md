@@ -63,6 +63,13 @@ events.  We need to add some more:
    - `chat:write`
    - `files:write`
 
+### Add User scopes
+We need a User token for the app in order to search slack messages:
+1. Features > OAuth & Permissions: scroll down to Scopes. User Token Scopes
+   are found after the Bot Token Scopes. By default the app has no user scopes.
+2. Add the following scopes:
+   - `search:read`
+
 ### Allow users to DM the app
 1. Features > App Home
 2. Under Messages Tabs, ensure the "Allow users to send Slash commands and messages from
@@ -71,7 +78,7 @@ events.  We need to add some more:
 ### Install the app
 1. Features > OAuth & Permissions
 2. Under "OAuth Tokens for Your Workspace", click "Install to Workspace"
-3. This will generate the bot token (starts `xoxb-`)
+3. This will generate the bot token (starts `xoxb-`) and the user token (starts `xoxp-`)
 
 If you update any scopes after installing the app, you'll need to reinstall it (slack will
 usually prompt for this).
@@ -135,6 +142,7 @@ The following slack environment variables need to be set:
 - `SLACK_TECH_SUPPORT_CHANNEL`: channel where tech-support requests will be reposted
 - `SLACK_APP_TOKEN`: app-level token generated above (starts `xapp-`); found on the app's Basic Information page
 - `SLACK_BOT_TOKEN`: bot token generated above (starts `xoxb-`); found on the app's Oauth and Permissions page
+- `SLACK_BOT_USER_TOKEN`: user token generated above (starts `xoxp-`); found on the app's Oauth and Permissions page
 - `SLACK_SIGNING_SECRET`: Found on the app's Basic Information page, under App Credentials
 - `SLACK_APP_USERNAME`: The app's default name (and the name users will refer to the Bot as in Slack); found under Features > App Home
 
