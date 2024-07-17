@@ -251,13 +251,14 @@ def register_listeners(app, config, channels, bot_user_id, internal_user_ids):
         # We don't use the matcher for this, because we want to tell users to
         # call for support from a non-dm channel
         if event["channel_type"] in ["channel", "group"]:
-            # Respond with SOS reaction
+            # Respond with reaction
             # If we've already responded, the attempt to react here will raise
             # an exception; if this happens, then the user is editing something
             # other than the keyword in the message, and we don't need to repost
             # it again. We let the default error handler will deal with it.
+            reaction = {"tech-support": "sos", "bennett-admins": "flamingo"}[keyword]
             app.client.reactions_add(
-                channel=channel, timestamp=message["ts"], name="sos"
+                channel=channel, timestamp=message["ts"], name=reaction
             )
             logger.info(f"Received {keyword} message", message=message["text"])
             if keyword == "tech-support":
