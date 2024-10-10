@@ -56,6 +56,52 @@ def test_joined_channels(mock_app):
     )
 
 
+@httpretty.activate(allow_net_connect=False)
+@pytest.mark.parametrize(
+    "setting,value",
+    [
+        # Note: channel names are set in pyproject.toml
+        # Channel ids are defined by the response from the response to
+        # the conversations.list endpoint, defined in mock_http_request.py
+        # support channel settings can be a channel name
+        ("SLACK_TECH_SUPPORT_CHANNEL", "techsupport"),
+        ("SLACK_BENNETT_ADMINS_CHANNEL", "bennettadmins"),
+        # support channel settings can be a channel ID
+        ("SLACK_TECH_SUPPORT_CHANNEL", "C0001"),
+        ("SLACK_BENNETT_ADMINS_CHANNEL", "C0000"),
+    ],
+)
+def test_register_listeners_support_channel_settings(setting, value):
+    register_bot_uris()
+    app = App(raise_error_for_unhandled_request=True)
+    channels = bot.get_channels(app.client)
+    bot_user_id, internal_user_ids = bot.get_users_info(app.client)
+    bot.join_all_channels(app.client, channels, bot_user_id)
+    with patch(f"bennettbot.settings.{setting}", value):
+        bot.register_listeners(app, config, channels, bot_user_id, internal_user_ids)
+
+
+@httpretty.activate(allow_net_connect=False)
+@pytest.mark.parametrize(
+    "setting,value",
+    [
+        ("SLACK_TECH_SUPPORT_CHANNEL", "foo"),
+        ("SLACK_BENNETT_ADMINS_CHANNEL", "C9999"),
+    ],
+)
+def test_register_listeners_invalid_support_channel_settings(setting, value):
+    register_bot_uris()
+    app = App(raise_error_for_unhandled_request=True)
+    channels = bot.get_channels(app.client)
+    bot_user_id, internal_user_ids = bot.get_users_info(app.client)
+    bot.join_all_channels(app.client, channels, bot_user_id)
+    with (
+        patch(f"bennettbot.settings.{setting}", value),
+        pytest.raises(ValueError, match=f"channel id '{value}' not found"),
+    ):
+        bot.register_listeners(app, config, channels, bot_user_id, internal_user_ids)
+
+
 def test_schedule_job(mock_app):
     handle_message(mock_app, "<@U1234> test do job 10")
 
